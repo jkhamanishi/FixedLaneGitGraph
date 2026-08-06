@@ -17,6 +17,5 @@ dependencies {
         // Add VCS and Git dependencies
         bundledPlugin("Git4Idea")
         bundledModule("intellij.platform.vcs.log")
-        bundledPlugin("org.jetbrains.kotlin")
     }
 }
