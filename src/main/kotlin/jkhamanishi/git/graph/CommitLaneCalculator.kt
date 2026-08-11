@@ -6,103 +6,80 @@ import java.lang.reflect.Method
 
 object CommitLaneCalculator {
 
-    private val logger = ConsoleLogger("CommitLaneCalculator")
-
-    const val MAX_LANES = 5
-
-    data class ChildRelation(val childIndex: Int, val parentPosition: Int)
-
-    fun computeNodeParents(visibleGraph: Any, nodesCount: Int, getNodeMethod: Method): HashMap<Int, List<Int>> {
-        val nodeParents = HashMap<Int, List<Int>>()
+    fun computeNodeLanes(visibleGraph: Any, nodesCount: Int, getNodeMethod: Method): HashMap<Int, Int> {
+        val commitMap = CommitMap(visibleGraph, nodesCount, getNodeMethod)
+        val laneManager = LaneManager()
+        val nodeToLane = HashMap<Int, Int>()
 
         for (i in 0 until nodesCount) {
-            val node = getNodeMethod.invoke(visibleGraph, i) ?: continue
-            val getAdjacentMethod = node.javaClass.methods.firstOrNull { it.name == "getAdjacentRows" }?.apply { isAccessible = true }
-
-            val rawAdjacent = if (getAdjacentMethod != null) {
-                try {
-                    val paramTypes = getAdjacentMethod.parameterTypes
-                    val result = when {
-                        paramTypes.isEmpty() -> getAdjacentMethod.invoke(node)
-                        paramTypes.size == 1 && (paramTypes[0] == Boolean::class.java || paramTypes[0] == Boolean::class.javaPrimitiveType) -> {
-                            getAdjacentMethod.invoke(node, true)
-                        }
-                        paramTypes.size == 1 -> {
-                            getAdjacentMethod.invoke(node, i)
-                        }
-                        else -> null
-                    }
-                    result as? List<*> ?: emptyList<Any>()
-                } catch (e: Exception) {
-                    logger.warn("Failed to invoke getAdjacentRows for index $i: ${e.javaClass.simpleName} - ${e.message}")
-                    emptyList<Any>()
-                }
-            } else {
-                emptyList<Any>()
-            }
-
-            val parentIndices = rawAdjacent.mapNotNull { p ->
-                when (p) {
-                    is Int -> p
-                    else -> {
-                        val m = p?.javaClass?.methods?.firstOrNull {
-                            it.name == "getNodeIndex" || it.name == "getIndex" || it.name == "getId" || it.name == "toInt"
-                        }?.apply { isAccessible = true }
-                        m?.invoke(p) as? Int
-                    }
-                }
-            }
-            nodeParents[i] = parentIndices
+            val children = commitMap.getChildren(i)
+            nodeToLane[i] = getNodeLane(children, laneManager, commitMap, nodeToLane)
+            freeUpLanes(children, laneManager, nodeToLane, i, commitMap)
         }
-        return nodeParents
+
+        return nodeToLane
     }
 
-    fun computeNodeLanes(nodesCount: Int, nodeParents: HashMap<Int, List<Int>>): HashMap<Int, Int> {
-        val parentToChildren = HashMap<Int, MutableList<ChildRelation>>()
-
-        for (c in 0 until nodesCount) {
-            val parents = nodeParents[c] ?: emptyList()
-            parents.forEachIndexed { pos, p ->
-                parentToChildren.getOrPut(p) { mutableListOf() }
-                    .add(ChildRelation(childIndex = c, parentPosition = pos))
-            }
+    fun getNodeLane(
+        children: List<CommitMap.ChildRelation>,
+        laneManager: LaneManager,
+        commitMap: CommitMap,
+        nodeToLane: HashMap<Int, Int>
+    ): Int {
+        // Rule 1: If the current commit has no child commit,
+        // assign a new/reused lane
+        if (children.isEmpty()) {
+            return laneManager.acquireLane()
         }
 
-        val nodeToLane = HashMap<Int, Int>()
-        var laneCounter = 0
+        val primaryChild = children[0]
+        val childIndex = primaryChild.childIndex
+        val parentPos = primaryChild.parentPosition
+        val childParents = commitMap.getParents(childIndex)
+        val isChildMerge = childParents.size > 1
+        val childLane = nodeToLane[childIndex] ?: laneManager.acquireLane()
 
-        fun acquireLane(): Int {
-            val current = laneCounter
-            if (laneCounter < MAX_LANES) {
-                laneCounter++
-            }
-            return current.coerceAtMost(MAX_LANES)
+        // Rule 2: If the child commit is a merge commit and
+        // has the current commit as the first parent,
+        // put it in the same lane.
+        if (isChildMerge && parentPos == 0) {
+            return childLane
         }
 
-        for (i in 0 until nodesCount) {
-            val children = parentToChildren[i] ?: emptyList()
+        // Rule 3: If the child commit is a merge commit and
+        // has the current commit as the second parent,
+        // assign a new/reused lane.
+        if (isChildMerge && parentPos >= 1) {
+            return laneManager.acquireLane()
+        }
 
-            if (children.isEmpty()) {
-                nodeToLane[i] = acquireLane()
-            } else {
-                val primaryChild = children[0]
-                val childIdx = primaryChild.childIndex
-                val parentPos = primaryChild.parentPosition
-                val childParents = nodeParents[childIdx] ?: emptyList()
-                val isChildMerge = childParents.size > 1
-                val childLane = nodeToLane[childIdx] ?: acquireLane()
+        // Rule 4: If the child commit is not a merge commit,
+        // make the current commit the same lane as the child commit.
+        return childLane
+    }
 
-                if (isChildMerge) {
-                    if (parentPos == 0) {
-                        nodeToLane[i] = childLane
-                    } else {
-                        nodeToLane[i] = acquireLane()
-                    }
-                } else {
-                    nodeToLane[i] = childLane
-                }
+    fun freeUpLanes(
+        children: List<CommitMap.ChildRelation>,
+        laneManager: LaneManager,
+        nodeToLane: HashMap<Int, Int>,
+        currentIndex: Int,
+        commitMap: CommitMap
+    ) {
+        if (children.size <= 1) {
+            return
+        }
+
+        val currentLane = nodeToLane[currentIndex]
+
+        // If there are multiple children, make any lane not used by the primary path available
+        for (i in 1 until children.size) {
+            val child = children[i]
+            val childLane = nodeToLane[child.childIndex]
+            val isChildMerge = commitMap.getParents(child.childIndex).size > 1
+
+            if (childLane != null && childLane != currentLane && !isChildMerge) {
+                laneManager.freeUpLane(childLane)
             }
         }
-        return nodeToLane
     }
 }

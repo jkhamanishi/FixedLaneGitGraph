@@ -129,8 +129,7 @@ object PersistentLayoutManager {
 
                 val getNodeMethod = resolveNodeGetterMethod(visibleGraph) ?: return
 
-                val nodeParents = CommitLaneCalculator.computeNodeParents(visibleGraph, nodesCount, getNodeMethod)
-                val nodeToLane = CommitLaneCalculator.computeNodeLanes(nodesCount, nodeParents)
+                val nodeToLane = CommitLaneCalculator.computeNodeLanes(visibleGraph, nodesCount, getNodeMethod)
 
                 for ((nodeIndex, lane) in nodeToLane) {
                     assignLane(nodeIndex, lane)

@@ -118,7 +118,7 @@ class GitGraphInitializer : ProjectActivity {
             "Git log intercepted",
             "Successfully accessed Git Log table with $rowCount rows and $columnCount columns."
         )
-        LongEdgesEnforcer().enableLongEdgesViaProperty(swingTable)
+        LongEdgesEnforcer.enableLongEdgesViaProperty(swingTable)
 
         // Delegate all graph inspection and layout injection to PersistentLayoutManager
         PersistentLayoutManager.applyLayout(swingTable)

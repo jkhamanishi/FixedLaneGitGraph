@@ -6,7 +6,8 @@ plugins {
     id("org.jetbrains.intellij.platform")
 }
 
-version = "1.0.0"
+version = "1.0.1"
+
 group = "jkhamanishi.git.graph"
 
 // Read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html

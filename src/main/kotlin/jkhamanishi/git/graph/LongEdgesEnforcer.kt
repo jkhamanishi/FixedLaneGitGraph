@@ -6,7 +6,7 @@ import com.intellij.ide.DataManager
 import java.awt.Container
 import javax.swing.JTable
 
-class LongEdgesEnforcer {
+object LongEdgesEnforcer {
 
     private val logger = ConsoleLogger("LongEdgesEnforcer", false)
 
