@@ -1,5 +1,5 @@
 <!-- Keep a Changelog guide -> https://keepachangelog.com -->
 
-# FixedLaneGitGraph2 Changelog
+# Fixed Lane Git Graph Plugin Changelog
 
 ## [Unreleased]

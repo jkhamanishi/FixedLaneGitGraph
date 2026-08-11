@@ -25,7 +25,7 @@ class GitGraphInitializer : ProjectActivity {
     override suspend fun execute(project: Project) {
         VcsNotifier.getInstance(project).notifySuccess(
             "fixed.lane.git.graph.notification",
-            "FixedLaneGitGraph2",
+            "FixedLaneGitGraph plugin is activated",
             "FixedLaneGitGraph active for project: ${project.name}"
         )
 

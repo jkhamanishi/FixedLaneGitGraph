@@ -1,7 +1,7 @@
 <idea-plugin>
-    <id>jkhamanishi.git.graph.FixedLaneGitGraph2</id>
-    <name>FixedLaneGitGraph2</name>
-    <vendor url="https://github.com/jkhamanishi">Jackson Hamanishi</vendor>
+    <id>jkhamanishi.FixedLaneGitGraph</id>
+    <name>Fixed Lane Git Graph</name>
+    <vendor url="https://github.com/jkhamanishi">jkhamanishi</vendor>
 
     <description><![CDATA[
         Custom renderer for the Git Log graph to maintain fixed lane positions.

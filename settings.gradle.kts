@@ -1,6 +1,6 @@
 import org.jetbrains.intellij.platform.gradle.extensions.intellijPlatform
 
-rootProject.name = "FixedLaneGitGraph2"
+rootProject.name = "FixedLaneGitGraph"
 
 pluginManagement {
     plugins {
