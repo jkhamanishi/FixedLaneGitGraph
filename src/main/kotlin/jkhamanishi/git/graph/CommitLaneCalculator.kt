@@ -26,10 +26,11 @@ object CommitLaneCalculator {
         commitMap: CommitMap,
         nodeToLane: HashMap<Int, Int>
     ): Int {
+
         // Rule 1: If the current commit has no child commit,
-        // assign a new/reused lane
+        // assign the outermost lane.
         if (children.isEmpty()) {
-            return laneManager.acquireLane()
+            return laneManager.acquireRightmostLane()
         }
 
         val primaryChild = children[0]

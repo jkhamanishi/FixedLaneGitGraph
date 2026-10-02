@@ -16,6 +16,11 @@ class LaneManager {
         return lanes.size - 1
     }
 
+    fun acquireRightmostLane(): Int {
+        lanes.add(true)
+        return lanes.size - 1
+    }
+
     fun freeUpLane(lane: Int) {
         if (lane >= 0 && lane < lanes.size) {
             lanes[lane] = false

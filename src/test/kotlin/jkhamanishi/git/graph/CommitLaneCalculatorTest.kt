@@ -1,3 +1,5 @@
+@file:Suppress("unused")
+
 package jkhamanishi.git.graph
 
 import org.junit.Assert.assertEquals
@@ -24,6 +26,36 @@ class CommitLaneCalculatorTest {
         assertEquals(0, lanes[0])
         assertEquals(0, lanes[1])
         assertEquals(0, lanes[2])
+    }
+
+    @Test
+    fun `commit with no children uses outermost lane instead of reusing an inner lane`() {
+        val laneManager = LaneManager().apply {
+            acquireLane()
+            acquireLane()
+            acquireLane()
+            freeUpLane(1)
+        }
+
+        val visibleGraph = FakeVisibleGraph(
+            listOf(
+                FakeNode(emptyList())
+            )
+        )
+        val commitMap = CommitMap(
+            visibleGraph,
+            visibleGraph.getVisibleNodesCount(),
+            FakeVisibleGraph::class.java.getMethod("getNode", Int::class.javaPrimitiveType)
+        )
+
+        val lane = CommitLaneCalculator.getNodeLane(
+            children = emptyList(),
+            laneManager = laneManager,
+            commitMap = commitMap,
+            nodeToLane = hashMapOf()
+        )
+
+        assertEquals(3, lane)
     }
 
     @Test
