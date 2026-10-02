@@ -113,11 +113,6 @@ class GitGraphInitializer : ProjectActivity {
 
         logger.info("Intercepting Git Log table ($rowCount rows, $columnCount columns). Table model: ${swingTable.model.javaClass.name}")
 
-        VcsNotifier.getInstance(project).notifySuccess(
-            "fixed.lane.git.graph.table",
-            "Git log intercepted",
-            "Successfully accessed Git Log table with $rowCount rows and $columnCount columns."
-        )
         LongEdgesEnforcer.enableLongEdgesViaProperty(swingTable)
 
         // Delegate all graph inspection and layout injection to PersistentLayoutManager

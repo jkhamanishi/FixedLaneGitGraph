@@ -2,17 +2,72 @@
 
 package jkhamanishi.git.graph
 
+import com.intellij.vcs.log.graph.api.elements.GraphElement
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
+import java.util.Comparator
 import javax.swing.JTable
 
 object PersistentLayoutManager {
 
     private val logger = ConsoleLogger("PersistentLayoutManager")
     private val laneCache = HashMap<Int, Int>()
+    private var longSecondParentEdges: Set<MergeEdgeRouter.EdgeKey> = emptySet()
+
+    private class LayoutGetterInvocationHandler(val delegate: Any) : java.lang.reflect.InvocationHandler {
+        override fun invoke(proxy: Any?, method: Method, args: Array<out Any?>?): Any? {
+            if (method.name == "apply" || method.name == "applyAsInt" || method.name == "invoke") {
+                val nodeIndex = if (args != null && args.isNotEmpty()) args[0] as Int else 0
+
+                val targetMethod = delegate.javaClass.methods.firstOrNull {
+                    it.parameterCount == 1 && (it.parameterTypes[0] == Int::class.java || it.parameterTypes[0] == Int::class.javaPrimitiveType)
+                } ?: method
+
+                targetMethod.isAccessible = true
+                val rawLayoutIndex = try {
+                    targetMethod.invoke(delegate, nodeIndex) as? Int ?: 0
+                } catch (e: Exception) {
+                    logger.warn("Failed to invoke original getter method: ${e.message}")
+                    0
+                }
+
+                return getLaneForNode(nodeIndex, rawLayoutIndex)
+            }
+
+            method.isAccessible = true
+            return method.invoke(delegate, *(args ?: emptyArray()))
+        }
+    }
+
+    private class RoutingComparatorInvocationHandler(val delegate: Any) : java.lang.reflect.InvocationHandler {
+        override fun invoke(proxy: Any?, method: Method, args: Array<out Any?>?): Any? {
+            if (method.name == "compare" && args != null && args.size == 2) {
+                val first = args[0] as? GraphElement
+                val second = args[1] as? GraphElement
+                if (first != null && second != null) {
+                    return MergeEdgeRouter.compare(first, second, longSecondParentEdges) { left, right ->
+                        invokeCompare(delegate, left, right)
+                    }
+                }
+            }
+
+            method.isAccessible = true
+            return method.invoke(delegate, *(args ?: emptyArray()))
+        }
+
+        private fun invokeCompare(delegate: Any, first: GraphElement, second: GraphElement): Int {
+            val targetMethod = delegate.javaClass.methods.firstOrNull {
+                it.name == "compare" && it.parameterCount == 2
+            } ?: error("Could not locate compare method on comparator delegate ${delegate.javaClass.name}")
+
+            targetMethod.isAccessible = true
+            return targetMethod.invoke(delegate, first, second) as? Int ?: 0
+        }
+    }
 
     fun clear() {
         laneCache.clear()
+        longSecondParentEdges = emptySet()
     }
 
     fun assignLane(nodeIndex: Int, lane: Int) {
@@ -100,10 +155,11 @@ object PersistentLayoutManager {
             logger.info("DEBUG: Cleared PersistentLayoutManager cache.")
 
             val comparatorField = printElementGenerator.javaClass.getDeclaredField("elementComparator").apply { isAccessible = true }
-            val comparator = comparatorField.get(printElementGenerator) ?: run {
+            val rawComparator = comparatorField.get(printElementGenerator) ?: run {
                 logger.warn("DEBUG: elementComparator field was null on printElementGenerator.")
                 return
             }
+            val comparator = unwrapRoutingComparator(rawComparator)
 
             val getterField = comparator.javaClass.declaredFields.firstOrNull {
                 it.name == "myLayoutIndexGetter" || it.type.name.contains("Function")
@@ -112,10 +168,11 @@ object PersistentLayoutManager {
                 return
             }
 
-            val originalGetter = getterField.get(comparator) ?: run {
+            val rawGetter = getterField.get(comparator) ?: run {
                 logger.warn("DEBUG: originalGetter was null.")
                 return
             }
+            val originalGetter = unwrapLayoutGetter(rawGetter)
 
             logger.info("DEBUG: originalGetter type: ${originalGetter.javaClass.name}")
 
@@ -128,6 +185,8 @@ object PersistentLayoutManager {
                 logger.info("VisibleGraph node count successfully resolved: $nodesCount nodes found.")
 
                 val getNodeMethod = resolveNodeGetterMethod(visibleGraph) ?: return
+                val commitMap = CommitMap(visibleGraph, nodesCount, getNodeMethod)
+                longSecondParentEdges = MergeEdgeRouter.collectLongSecondParentEdges(commitMap, nodesCount)
 
                 val nodeToLane = CommitLaneCalculator.computeNodeLanes(visibleGraph, nodesCount, getNodeMethod)
 
@@ -136,12 +195,14 @@ object PersistentLayoutManager {
                 }
 
                 logger.info("Successfully computed fixed node-index rules across $nodesCount nodes.")
+                logger.info("Identified ${longSecondParentEdges.size} long second-parent merge edges for outside routing.")
             } catch (e: Exception) {
                 logger.warn("Could not compute fixed commit lane logic: ${e.message}", e)
             }
 
             val proxyGetter = createProxyGetter(originalGetter)
             getterField.set(comparator, proxyGetter)
+            comparatorField.set(printElementGenerator, createRoutingComparator(comparator))
             logger.info("Successfully injected Persistent Layout Proxy with explicit rule comments!")
 
             clearGeneratorCache(printElementGenerator)
@@ -206,29 +267,41 @@ object PersistentLayoutManager {
     private fun createProxyGetter(originalGetter: Any): Any {
         return Proxy.newProxyInstance(
             originalGetter.javaClass.classLoader,
-            originalGetter.javaClass.interfaces
-        ) { _, method, args ->
-            if (method.name == "apply" || method.name == "applyAsInt" || method.name == "invoke") {
-                val nodeIndex = if (args != null && args.isNotEmpty()) args[0] as Int else 0
+            originalGetter.javaClass.interfaces,
+            LayoutGetterInvocationHandler(originalGetter)
+        )
+    }
 
-                val targetMethod = originalGetter.javaClass.methods.firstOrNull {
-                    it.parameterCount == 1 && (it.parameterTypes[0] == Int::class.java || it.parameterTypes[0] == Int::class.javaPrimitiveType)
-                } ?: method
+    private fun createRoutingComparator(originalComparator: Any): Any {
+        val interfaces = originalComparator.javaClass.interfaces
+        val comparatorInterfaces = if (interfaces.isEmpty()) arrayOf(Comparator::class.java) else interfaces
+        return Proxy.newProxyInstance(
+            originalComparator.javaClass.classLoader,
+            comparatorInterfaces,
+            RoutingComparatorInvocationHandler(originalComparator)
+        )
+    }
 
-                targetMethod.isAccessible = true
-                val rawLayoutIndex = try {
-                    targetMethod.invoke(originalGetter, nodeIndex) as? Int ?: 0
-                } catch (e: Exception) {
-                    logger.warn("Failed to invoke original getter method: ${e.message}")
-                    0
-                }
-
-                return@newProxyInstance getLaneForNode(nodeIndex, rawLayoutIndex)
+    private fun unwrapLayoutGetter(candidate: Any): Any {
+        if (Proxy.isProxyClass(candidate.javaClass)) {
+            val handler = Proxy.getInvocationHandler(candidate)
+            if (handler is LayoutGetterInvocationHandler) {
+                return handler.delegate
             }
-
-            method.isAccessible = true
-            method.invoke(originalGetter, *(args ?: emptyArray()))
         }
+
+        return candidate
+    }
+
+    private fun unwrapRoutingComparator(candidate: Any): Any {
+        if (Proxy.isProxyClass(candidate.javaClass)) {
+            val handler = Proxy.getInvocationHandler(candidate)
+            if (handler is RoutingComparatorInvocationHandler) {
+                return handler.delegate
+            }
+        }
+
+        return candidate
     }
 
     private fun clearGeneratorCache(printElementGenerator: Any) {

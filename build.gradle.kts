@@ -6,7 +6,7 @@ plugins {
     id("org.jetbrains.intellij.platform")
 }
 
-version = "1.0.1"
+version = "1.0.2"
 
 group = "jkhamanishi.git.graph"
 
