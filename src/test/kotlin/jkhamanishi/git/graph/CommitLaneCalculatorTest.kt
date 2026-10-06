@@ -49,6 +49,7 @@ class CommitLaneCalculatorTest {
         )
 
         val lane = CommitLaneCalculator.getNodeLane(
+            currentIndex = 0,
             children = emptyList(),
             laneManager = laneManager,
             commitMap = commitMap,

@@ -13,7 +13,7 @@ object CommitLaneCalculator {
 
         for (i in 0 until nodesCount) {
             val children = commitMap.getChildren(i)
-            nodeToLane[i] = getNodeLane(children, laneManager, commitMap, nodeToLane)
+            nodeToLane[i] = getNodeLane(i, children, laneManager, commitMap, nodeToLane)
             freeUpLanes(children, laneManager, nodeToLane, i, commitMap)
         }
 
@@ -21,6 +21,7 @@ object CommitLaneCalculator {
     }
 
     fun getNodeLane(
+        currentIndex: Int,
         children: List<CommitMap.ChildRelation>,
         laneManager: LaneManager,
         commitMap: CommitMap,
@@ -40,21 +41,32 @@ object CommitLaneCalculator {
         val isChildMerge = childParents.size > 1
         val childLane = nodeToLane[childIndex] ?: laneManager.acquireLane()
 
-        // Rule 2: If the child commit is a merge commit and
+        // Check if the current commit is a merge commit
+        val currentParents = commitMap.getParents(currentIndex)
+        val isCurrentMerge = currentParents.size > 1
+
+        // Rule 2: If the current commit is a merge commit and is the first parent
+        // of at least one of its children, place it on the leftmost lane
+        // to show it's on the primary development line.
+        if (isCurrentMerge && isChildMerge && parentPos == 0) {
+            return laneManager.acquireLeftmostLane()
+        }
+
+        // Rule 3: If the child commit is a merge commit and
         // has the current commit as the first parent,
         // put it in the same lane.
         if (isChildMerge && parentPos == 0) {
             return childLane
         }
 
-        // Rule 3: If the child commit is a merge commit and
+        // Rule 4: If the child commit is a merge commit and
         // has the current commit as the second parent,
-        // assign a new/reused lane.
+        // assign a new rightmost lane (not a reused interior lane).
         if (isChildMerge && parentPos >= 1) {
-            return laneManager.acquireLane()
+            return laneManager.acquireRightmostLane()
         }
 
-        // Rule 4: If the child commit is not a merge commit,
+        // Rule 5: If the child commit is not a merge commit,
         // make the current commit the same lane as the child commit.
         return childLane
     }
