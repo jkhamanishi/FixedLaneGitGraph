@@ -129,6 +129,40 @@ class GraphManagerTest {
         assert(lanes[1] != lanes[3]) { "Secondary parent should diverge to different lane" }
     }
 
+    @Test
+    fun `diamond merge keeps merge on first parent lane`() {
+        val visibleGraph = FakeVisibleGraph(
+            listOf(
+                FakeNode(listOf(1, 2)), // 0: merge commit
+                FakeNode(listOf(3)),    // 1: first parent
+                FakeNode(listOf(3)),    // 2: second parent
+                FakeNode(emptyList())   // 3: shared ancestor
+            )
+        )
+
+        val lanes = computeLanes(visibleGraph)
+
+        assertEquals(visibleGraph.getVisibleNodesCount(), lanes.size)
+        assertEquals(lanes[1], lanes[0])
+        assert(lanes[2] != lanes[1]) { "Second parent branch should use a different lane from the first parent path" }
+    }
+
+    @Test
+    fun `parent outside visible range still assigns lanes to all visible commits`() {
+        val visibleGraph = FakeVisibleGraph(
+            listOf(
+                FakeNode(listOf(5)),   // 0: parent is outside the visible range
+                FakeNode(emptyList())  // 1: independent visible commit
+            )
+        )
+
+        val lanes = computeLanes(visibleGraph)
+
+        assertEquals(visibleGraph.getVisibleNodesCount(), lanes.size)
+        assertEquals(0, lanes[0])
+        assert(lanes[1]!! >= 0) { "Independent visible commits should still receive a non-negative lane" }
+    }
+
     private data class FakeNode(private val parents: List<Int>) {
         fun getAdjacentRows(): List<Int> = parents
     }
