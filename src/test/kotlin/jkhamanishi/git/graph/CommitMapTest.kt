@@ -50,6 +50,7 @@ class CommitMapTest {
         assertEquals(emptyList<Int>(), commitMap.getParents(2))
     }
 
+    @Suppress("unused")
     private class FakeRowInfoNode(
         private val commit: Int,
         private val downRows: List<Int>,
@@ -62,11 +63,13 @@ class CommitMapTest {
         override fun getAdjacentRows(down: Boolean): List<Int> = if (down) downRows else upRows
     }
 
+    @Suppress("unused")
     private class FakeVisibleGraph(private val nodes: List<FakeRowInfoNode>) {
         fun getVisibleNodesCount(): Int = nodes.size
         fun getNode(index: Int): FakeRowInfoNode = nodes[index]
     }
 
+    @Suppress("unused")
     private class OverloadedNode(
         private val booleanRows: List<Int>,
         private val intRows: List<Int>
@@ -75,6 +78,7 @@ class CommitMapTest {
         fun getAdjacentRows(index: Int): List<Int> = if (index >= 0) intRows else emptyList()
     }
 
+    @Suppress("unused")
     private class OverloadedVisibleGraph(private val nodes: List<OverloadedNode>) {
         fun getVisibleNodesCount(): Int = nodes.size
         fun getNode(index: Int): OverloadedNode = nodes[index]

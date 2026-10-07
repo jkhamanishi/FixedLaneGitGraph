@@ -121,29 +121,15 @@ CommitMap contains:
     1 → [2]         // Commit 1 has parent 2
     2 → [3]         // Commit 2 has parent 3
     3 → []          // Commit 3 has no parents
-    
-  parentToChildren: HashMap<Int, List<ChildRelation>>
-    3 → [ChildRelation(2, pos=0)]  // 2 is child of 3 at position 0
-    2 → [ChildRelation(1, pos=0), ChildRelation(0, pos=1)]
-    1 → [ChildRelation(0, pos=0)]
 ```
 
-### 2.2 CommitMap.getParents() and getChildren()
+### 2.2 CommitMap.getParents()
 
 ```kotlin
 fun getParents(commitIndex: Int): List<Int> {
     return nodeParents[commitIndex] ?: emptyList()
 }
 // Returns: [parentIndex1, parentIndex2, ...]
-
-fun getChildren(commitIndex: Int): List<ChildRelation> {
-    return parentToChildren[commitIndex] ?: emptyList()
-}
-// Returns: [
-//   ChildRelation(childIndex=0, parentPosition=0),
-//   ChildRelation(childIndex=2, parentPosition=1),
-//   ...
-// ]
 ```
 
 ---
@@ -600,7 +586,6 @@ Result: Visual git graph displayed to user
    │ CommitMap                      │
    ├────────────────────────────────┤
    │ nodeParents: 0→[1,2]           │
-   │ parentToChildren: 1→[0]        │
    └──────────┬─────────────────────┘
               │
               └─ Passed to algorithm
@@ -758,12 +743,6 @@ CommitMap after extraction:
   nodeParents[2] = [3]
   nodeParents[3] = [4]
   nodeParents[4] = []
-  
-  parentToChildren[4] = [ChildRelation(3, 0)]
-  parentToChildren[3] = [ChildRelation(1, 0), ChildRelation(2, 0)]
-  parentToChildren[2] = [ChildRelation(0, 1)]
-  parentToChildren[1] = [ChildRelation(0, 0)]
-  parentToChildren[0] = []
 ```
 
 **Step 2: Vertex DAG Creation**

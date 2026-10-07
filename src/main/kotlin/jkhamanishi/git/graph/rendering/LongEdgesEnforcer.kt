@@ -1,8 +1,9 @@
 @file:Suppress("UnstableApiUsage")
 
-package jkhamanishi.git.graph
+package jkhamanishi.git.graph.rendering
 
 import com.intellij.ide.DataManager
+import jkhamanishi.git.graph.ConsoleLogger
 import java.awt.Container
 import javax.swing.JTable
 
@@ -154,3 +155,4 @@ object LongEdgesEnforcer {
         }
     }
 }
+

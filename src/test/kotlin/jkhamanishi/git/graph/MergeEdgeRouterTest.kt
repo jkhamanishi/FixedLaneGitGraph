@@ -3,6 +3,7 @@ package jkhamanishi.git.graph
 import com.intellij.vcs.log.graph.api.elements.GraphEdge
 import com.intellij.vcs.log.graph.api.elements.GraphEdgeType
 import com.intellij.vcs.log.graph.api.elements.GraphNode
+import jkhamanishi.git.graph.rendering.MergeEdgeRouter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -53,10 +54,12 @@ class MergeEdgeRouterTest {
         assertFalse(MergeEdgeRouter.isOutsideRoutedEdge(regularEdge, routedEdges))
     }
 
+    @Suppress("unused")
     private data class FakeNode(private val parents: List<Int>) {
         fun getAdjacentRows(): List<Int> = parents
     }
 
+    @Suppress("unused")
     private class FakeVisibleGraph(private val nodes: List<FakeNode>) {
         fun getVisibleNodesCount(): Int = nodes.size
         fun getNode(index: Int): FakeNode = nodes[index]

@@ -2,17 +2,17 @@
 
 package jkhamanishi.git.graph
 
+import jkhamanishi.git.graph.algorithm.GraphManager
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * Tests for the vscode-git-graph algorithm
+ * Tests for the graph lane assignment algorithm.
  *
- * These tests verify that the vscode-like path determination algorithm
- * correctly assigns commits to lanes, handling linear histories, branches,
- * and merges appropriately.
+ * These tests verify that the graph layout algorithm correctly assigns commits
+ * to lanes, handling linear histories, branches, and merges appropriately.
  */
-class CommitLaneCalculatorTest {
+class GraphManagerTest {
 
     @Test
     fun `linear history stays on a single lane`() {
@@ -24,11 +24,7 @@ class CommitLaneCalculatorTest {
             )
         )
 
-        val lanes = CommitLaneCalculator.computeNodeLanes(
-            visibleGraph = visibleGraph,
-            nodesCount = visibleGraph.getVisibleNodesCount(),
-            getNodeMethod = FakeVisibleGraph::class.java.getMethod("getNode", Int::class.javaPrimitiveType)
-        )
+        val lanes = computeLanes(visibleGraph)
 
         // All commits in a linear chain should stay on lane 0
         assertEquals(0, lanes[0])
@@ -47,11 +43,7 @@ class CommitLaneCalculatorTest {
             )
         )
 
-        val lanes = CommitLaneCalculator.computeNodeLanes(
-            visibleGraph = visibleGraph,
-            nodesCount = visibleGraph.getVisibleNodesCount(),
-            getNodeMethod = FakeVisibleGraph::class.java.getMethod("getNode", Int::class.javaPrimitiveType)
-        )
+        val lanes = computeLanes(visibleGraph)
 
         // All commits should have lanes assigned
         for (i in 0 until visibleGraph.getVisibleNodesCount()) {
@@ -76,11 +68,7 @@ class CommitLaneCalculatorTest {
             )
         )
 
-        val lanes = CommitLaneCalculator.computeNodeLanes(
-            visibleGraph = visibleGraph,
-            nodesCount = visibleGraph.getVisibleNodesCount(),
-            getNodeMethod = FakeVisibleGraph::class.java.getMethod("getNode", Int::class.javaPrimitiveType)
-        )
+        val lanes = computeLanes(visibleGraph)
 
         // vscode algorithm should assign lanes to all commits
         // The key invariant is that all commits get lane assignments
@@ -105,11 +93,7 @@ class CommitLaneCalculatorTest {
             )
         )
 
-        val lanes = CommitLaneCalculator.computeNodeLanes(
-            visibleGraph = visibleGraph,
-            nodesCount = visibleGraph.getVisibleNodesCount(),
-            getNodeMethod = FakeVisibleGraph::class.java.getMethod("getNode", Int::class.javaPrimitiveType)
-        )
+        val lanes = computeLanes(visibleGraph)
 
         // All commits should have assigned lanes
         for (i in 0 until visibleGraph.getVisibleNodesCount()) {
@@ -132,11 +116,7 @@ class CommitLaneCalculatorTest {
             )
         )
 
-        val lanes = CommitLaneCalculator.computeNodeLanes(
-            visibleGraph = visibleGraph,
-            nodesCount = visibleGraph.getVisibleNodesCount(),
-            getNodeMethod = FakeVisibleGraph::class.java.getMethod("getNode", Int::class.javaPrimitiveType)
-        )
+        val lanes = computeLanes(visibleGraph)
 
         // Verify all commits are assigned lanes
         for (i in 0 until visibleGraph.getVisibleNodesCount()) {
@@ -156,6 +136,15 @@ class CommitLaneCalculatorTest {
     private class FakeVisibleGraph(private val nodes: List<FakeNode>) {
         fun getVisibleNodesCount(): Int = nodes.size
         fun getNode(index: Int): FakeNode = nodes[index]
+    }
+
+    private fun computeLanes(visibleGraph: FakeVisibleGraph): HashMap<Int, Int> {
+        val commitMap = CommitMap(
+            visibleGraph,
+            visibleGraph.getVisibleNodesCount(),
+            FakeVisibleGraph::class.java.getMethod("getNode", Int::class.javaPrimitiveType)
+        )
+        return GraphManager.computeNodeLanes(commitMap, visibleGraph.getVisibleNodesCount())
     }
 }
 
