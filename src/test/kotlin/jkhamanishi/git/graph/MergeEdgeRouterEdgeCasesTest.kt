@@ -5,20 +5,27 @@ import com.intellij.vcs.log.graph.api.elements.GraphEdgeType
 import com.intellij.vcs.log.graph.api.elements.GraphNode
 import jkhamanishi.git.graph.rendering.MergeEdgeRouter
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class MergeEdgeRouterTest {
+class MergeEdgeRouterEdgeCasesTest {
 
     @Test
-    fun `collects only long second-parent merge edges`() {
+    fun `edge keys are direction agnostic`() {
+        assertEquals(
+            MergeEdgeRouter.EdgeKey.of(1, 3),
+            MergeEdgeRouter.EdgeKey.of(3, 1)
+        )
+    }
+
+    @Test
+    fun `collect long second parent edges ignores first parent and short edges`() {
         val visibleGraph = FakeVisibleGraph(
             listOf(
-                FakeNode(listOf(1, 3)),
-                FakeNode(listOf(2)),
+                FakeNode(listOf(3, 1, 4)),
                 FakeNode(emptyList()),
-                FakeNode(listOf(4)),
+                FakeNode(emptyList()),
+                FakeNode(emptyList()),
                 FakeNode(emptyList())
             )
         )
@@ -30,28 +37,28 @@ class MergeEdgeRouterTest {
 
         val routedEdges = MergeEdgeRouter.collectLongSecondParentEdges(commitMap, visibleGraph.getVisibleNodesCount())
 
-        assertEquals(setOf(MergeEdgeRouter.EdgeKey.of(0, 3)), routedEdges)
+        assertEquals(setOf(MergeEdgeRouter.EdgeKey.of(0, 4)), routedEdges)
     }
 
     @Test
-    fun `compare pushes routed merge edge after regular graph elements`() {
-        val routedEdges = setOf(MergeEdgeRouter.EdgeKey.of(0, 3))
-        val mergeEdge = GraphEdge.createNormalEdge(0, 3, GraphEdgeType.USUAL)
-        val node = GraphNode(1)
-
-        val result = MergeEdgeRouter.compare(mergeEdge, node, routedEdges) { _, _ -> -1 }
-
-        assertEquals(1, result)
-    }
-
-    @Test
-    fun `outside routing check ignores unrelated edges`() {
-        val routedEdges = setOf(MergeEdgeRouter.EdgeKey.of(0, 3))
-        val routedEdge = GraphEdge.createNormalEdge(0, 3, GraphEdgeType.USUAL)
+    fun `compare delegates to fallback when routing priority matches`() {
         val regularEdge = GraphEdge.createNormalEdge(1, 2, GraphEdgeType.USUAL)
+        val node = GraphNode(3)
 
-        assertTrue(MergeEdgeRouter.isOutsideRoutedEdge(routedEdge, routedEdges))
-        assertFalse(MergeEdgeRouter.isOutsideRoutedEdge(regularEdge, routedEdges))
+        val result = MergeEdgeRouter.compare(regularEdge, node, emptySet()) { _, _ -> 7 }
+
+        assertEquals(7, result)
+    }
+
+    @Test
+    fun `compare keeps regular element ahead of routed merge edge`() {
+        val routedEdges = setOf(MergeEdgeRouter.EdgeKey.of(0, 3))
+        val node = GraphNode(1)
+        val mergeEdge = GraphEdge.createNormalEdge(0, 3, GraphEdgeType.USUAL)
+
+        val result = MergeEdgeRouter.compare(node, mergeEdge, routedEdges) { _, _ -> 99 }
+
+        assertTrue(result < 0)
     }
 
     @Suppress("unused")

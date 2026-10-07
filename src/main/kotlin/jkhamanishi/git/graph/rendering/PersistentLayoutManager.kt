@@ -1,8 +1,11 @@
 @file:Suppress("UnstableApiUsage")
 
-package jkhamanishi.git.graph
+package jkhamanishi.git.graph.rendering
 
 import com.intellij.vcs.log.graph.api.elements.GraphElement
+import jkhamanishi.git.graph.ConsoleLogger
+import jkhamanishi.git.graph.CommitMap
+import jkhamanishi.git.graph.algorithm.GraphManager
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 import java.util.Comparator
@@ -188,7 +191,7 @@ object PersistentLayoutManager {
                 val commitMap = CommitMap(visibleGraph, nodesCount, getNodeMethod)
                 longSecondParentEdges = MergeEdgeRouter.collectLongSecondParentEdges(commitMap, nodesCount)
 
-                val nodeToLane = CommitLaneCalculator.computeNodeLanes(visibleGraph, nodesCount, getNodeMethod)
+                val nodeToLane = GraphManager.computeNodeLanes(commitMap, nodesCount)
 
                 for ((nodeIndex, lane) in nodeToLane) {
                     assignLane(nodeIndex, lane)
@@ -317,3 +320,5 @@ object PersistentLayoutManager {
         }
     }
 }
+
+

@@ -1,7 +1,8 @@
-package jkhamanishi.git.graph
+package jkhamanishi.git.graph.rendering
 
 import com.intellij.vcs.log.graph.api.elements.GraphEdge
 import com.intellij.vcs.log.graph.api.elements.GraphElement
+import jkhamanishi.git.graph.CommitMap
 
 object MergeEdgeRouter {
 
@@ -60,4 +61,6 @@ object MergeEdgeRouter {
         return EdgeKey.of(upNodeIndex, downNodeIndex)
     }
 }
+
+
 

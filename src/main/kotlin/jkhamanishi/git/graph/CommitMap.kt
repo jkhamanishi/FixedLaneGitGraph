@@ -3,14 +3,17 @@ package jkhamanishi.git.graph
 import com.intellij.vcs.log.graph.RowInfo
 import java.lang.reflect.Method
 
+/**
+ * Extracts commit parent-child relationships from the git log graph structure.
+ *
+ * This class handles reflection-based access to the IntelliJ VCS log API to build
+ * a map of which commits are parents/children of each other.
+ */
 class CommitMap(visibleGraph: Any, nodesCount: Int, getNodeMethod: Method) {
 
     private val logger = ConsoleLogger("CommitMap")
 
-    data class ChildRelation(val childIndex: Int, val parentPosition: Int)
-
     private val nodeParents = computeNodeParents(visibleGraph, nodesCount, getNodeMethod)
-    private val parentToChildren = computeChildRelation(nodesCount)
 
     private fun extractAdjacentRows(node: Any, rowIndex: Int): List<Any> {
         val rowInfo = node as? RowInfo<*>
@@ -66,6 +69,7 @@ class CommitMap(visibleGraph: Any, nodesCount: Int, getNodeMethod: Method) {
 
     private fun computeNodeParents(visibleGraph: Any, nodesCount: Int, getNodeMethod: Method): HashMap<Int, List<Int>> {
         val map = HashMap<Int, List<Int>>()
+        getNodeMethod.isAccessible = true
         for (i in 0 until nodesCount) {
             val node = getNodeMethod.invoke(visibleGraph, i) ?: continue
             val rawAdjacent = extractAdjacentRows(node, i)
@@ -86,23 +90,9 @@ class CommitMap(visibleGraph: Any, nodesCount: Int, getNodeMethod: Method) {
         return map
     }
 
-    private fun computeChildRelation(nodesCount: Int): HashMap<Int, MutableList<ChildRelation>> {
-        val map = HashMap<Int, MutableList<ChildRelation>>()
-        for (c in 0 until nodesCount) {
-            val parents = nodeParents[c] ?: emptyList()
-            parents.forEachIndexed { pos, p ->
-                map.getOrPut(p) { mutableListOf() }
-                    .add(ChildRelation(childIndex = c, parentPosition = pos))
-            }
-        }
-        return map
-    }
-
-    fun getChildren(i: Int): List<ChildRelation> {
-        return parentToChildren[i] ?: emptyList()
-    }
 
     fun getParents(index: Int): List<Int> {
         return nodeParents[index] ?: emptyList()
     }
 }
+
