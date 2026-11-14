@@ -21,7 +21,7 @@ object PersistentLayoutManager {
     private class LayoutGetterInvocationHandler(val delegate: Any) : java.lang.reflect.InvocationHandler {
         override fun invoke(proxy: Any?, method: Method, args: Array<out Any?>?): Any? {
             if (method.name == "apply" || method.name == "applyAsInt" || method.name == "invoke") {
-                val nodeIndex = if (args != null && args.isNotEmpty()) args[0] as Int else 0
+                val nodeIndex = if (!args.isNullOrEmpty()) args[0] as Int else 0
 
                 val targetMethod = delegate.javaClass.methods.firstOrNull {
                     it.parameterCount == 1 && (it.parameterTypes[0] == Int::class.java || it.parameterTypes[0] == Int::class.javaPrimitiveType)
@@ -240,7 +240,7 @@ object PersistentLayoutManager {
     }
 
     private fun resolveNodeGetterMethod(visibleGraph: Any): Method? {
-        var getNodeMethod = visibleGraph.javaClass.methods.firstOrNull {
+        var getNodeMethod: Method? = visibleGraph.javaClass.methods.firstOrNull {
             it.parameterCount == 1 &&
                     (it.parameterTypes[0] == Int::class.java || it.parameterTypes[0] == Int::class.javaPrimitiveType) &&
                     !it.returnType.isPrimitive &&
@@ -312,7 +312,8 @@ object PersistentLayoutManager {
             val cacheField = printElementGenerator.javaClass.getDeclaredField("cache").apply { isAccessible = true }
             val cache = cacheField.get(printElementGenerator)
             if (cache != null) {
-                cache.javaClass.methods.firstOrNull { it.name == "clear" }?.invoke(cache)
+                val clearMethod: Method? = cache.javaClass.methods.firstOrNull { it.name == "clear" }
+        clearMethod?.invoke(cache)
                 logger.info("Cleared PrintElementGeneratorImpl cache.")
             }
         } catch (e: Exception) {
