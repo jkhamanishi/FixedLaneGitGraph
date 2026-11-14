@@ -18,12 +18,14 @@ object MergeEdgeRouter {
         }
     }
 
-    fun collectLongSecondParentEdges(commitMap: CommitMap, nodesCount: Int): Set<EdgeKey> {
+    fun collectLongSecondParentEdges(commitMap: CommitMap, nodesCount: Int): Set<EdgeKey> =
+        collectLongSecondParentEdges(nodesCount) { commitMap.getParents(it) }
+
+    fun collectLongSecondParentEdges(nodesCount: Int, parentsOf: (Int) -> List<Int>): Set<EdgeKey> {
         val longEdges = linkedSetOf<EdgeKey>()
 
         for (childIndex in 0 until nodesCount) {
-            val parents = commitMap.getParents(childIndex)
-            parents.forEachIndexed { parentPosition, parentIndex ->
+            parentsOf(childIndex).forEachIndexed { parentPosition, parentIndex ->
                 if (parentPosition >= 1 && kotlin.math.abs(parentIndex - childIndex) > 1) {
                     longEdges += EdgeKey.of(childIndex, parentIndex)
                 }

@@ -6,6 +6,7 @@ import com.intellij.vcs.log.graph.api.elements.GraphElement
 import jkhamanishi.git.graph.ConsoleLogger
 import jkhamanishi.git.graph.CommitMap
 import jkhamanishi.git.graph.algorithm.GraphManager
+import jkhamanishi.git.graph.algorithm.RenderRankAligner
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 import java.util.Comparator
@@ -49,22 +50,13 @@ object PersistentLayoutManager {
                 val second = args[1] as? GraphElement
                 if (first != null && second != null) {
                     return MergeEdgeRouter.compare(first, second, longSecondParentEdges) { left, right ->
-                        invokeCompare(delegate, left, right)
+                        RowElementOrder.compare(left, right) { nodeIndex -> getLaneForNode(nodeIndex, nodeIndex) }
                     }
                 }
             }
 
             method.isAccessible = true
             return method.invoke(delegate, *(args ?: emptyArray()))
-        }
-
-        private fun invokeCompare(delegate: Any, first: GraphElement, second: GraphElement): Int {
-            val targetMethod = delegate.javaClass.methods.firstOrNull {
-                it.name == "compare" && it.parameterCount == 2
-            } ?: error("Could not locate compare method on comparator delegate ${delegate.javaClass.name}")
-
-            targetMethod.isAccessible = true
-            return targetMethod.invoke(delegate, first, second) as? Int ?: 0
         }
     }
 
@@ -189,9 +181,16 @@ object PersistentLayoutManager {
 
                 val getNodeMethod = resolveNodeGetterMethod(visibleGraph) ?: return
                 val commitMap = CommitMap(visibleGraph, nodesCount, getNodeMethod)
-                longSecondParentEdges = MergeEdgeRouter.collectLongSecondParentEdges(commitMap, nodesCount)
+                // Long second-parent merge edges are no longer routed outside. They stay in their
+                // row's sort order so they occupy a column, which keeps commits from shifting left.
+                longSecondParentEdges = emptySet()
 
-                val nodeToLane = GraphManager.computeNodeLanes(commitMap, nodesCount)
+                val nodeToLane = GraphManager.computeNodeLanes(
+                    commitMap,
+                    nodesCount,
+                    RenderRankAligner.SHOW_LONG_EDGES_SIZE,
+                    RenderRankAligner.SHOW_LONG_EDGES_PART,
+                ) { _, _ -> false }
 
                 for ((nodeIndex, lane) in nodeToLane) {
                     assignLane(nodeIndex, lane)
@@ -306,6 +305,7 @@ object PersistentLayoutManager {
 
         return candidate
     }
+
 
     private fun clearGeneratorCache(printElementGenerator: Any) {
         try {

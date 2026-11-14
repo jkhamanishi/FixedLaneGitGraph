@@ -64,7 +64,8 @@ class PersistentLayoutManagerTest {
 
         val mergeEdge = GraphEdge.createNormalEdge(0, 3, GraphEdgeType.USUAL)
         val node = GraphNode(1)
-        assertTrue(generator.elementComparator.compare(mergeEdge, node) > 0)
+        // Long second-parent merge edges are no longer routed outside, so the fallback order applies.
+        assertTrue(generator.elementComparator.compare(mergeEdge, node) < 0)
     }
 
     @Test

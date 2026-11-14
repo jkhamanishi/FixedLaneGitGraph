@@ -10,9 +10,34 @@ import jkhamanishi.git.graph.CommitMap
  */
 object GraphManager {
 
-    fun computeNodeLanes(commitMap: CommitMap, nodesCount: Int): HashMap<Int, Int> {
-        val graph = Graph()
+    fun computeNodeLanes(commitMap: CommitMap, nodesCount: Int): HashMap<Int, Int> =
+        computeNodeLanes(commitMap, nodesCount, RenderRankAligner.SHOW_LONG_EDGES_SIZE, RenderRankAligner.SHOW_LONG_EDGES_PART) { _, _ -> false }
+
+    fun computeNodeLanes(
+        commitMap: CommitMap,
+        nodesCount: Int,
+        longEdgeSize: Int,
+        visiblePartSize: Int,
+        isOutsideRouted: (Int, Int) -> Boolean,
+    ): HashMap<Int, Int> {
+        val (rawLanes, edges) = computeRawLanes(nodesCount) { commitMap.getParents(it) }
+        // Outside-routed edges are ordered after every node, so they never count towards a node's column.
+        val countedEdges = edges.filterNot { (child, parent) -> isOutsideRouted(child, parent) }
+        val alignedLanes = RenderRankAligner.align(rawLanes, countedEdges, longEdgeSize, visiblePartSize)
+
         val nodeToLane = HashMap<Int, Int>()
+        for (i in 0 until nodesCount) {
+            nodeToLane[i] = alignedLanes[i]
+        }
+        return nodeToLane
+    }
+
+    /** Raw lanes from the path algorithm plus (child, parent) edges with child < parent. */
+    internal fun computeRawLanes(
+        nodesCount: Int,
+        parentsOf: (Int) -> List<Int>,
+    ): Pair<IntArray, List<Pair<Int, Int>>> {
+        val graph = Graph()
         val nullVertex = GraphVertex(NULL_VERTEX_ID)
 
         // Build vertex graph
@@ -22,7 +47,7 @@ object GraphManager {
 
         // Build parent-child relationships
         for (i in 0 until nodesCount) {
-            val parents = commitMap.getParents(i)
+            val parents = parentsOf(i)
             for (parentIdx in parents) {
                 if (parentIdx >= 0 && parentIdx < nodesCount) {
                     graph.vertices[i].parents.add(graph.vertices[parentIdx])
@@ -45,14 +70,14 @@ object GraphManager {
             }
         }
 
-        // Extract lane assignments
+        val rawLanes = IntArray(nodesCount) { graph.vertices[it].x }
+        val edges = ArrayList<Pair<Int, Int>>()
         for (vertex in graph.vertices) {
-            if (vertex.onBranch != null) {
-                nodeToLane[vertex.id] = vertex.x
+            for (parent in vertex.parents) {
+                if (parent.id > vertex.id) edges.add(vertex.id to parent.id)
             }
         }
-
-        return nodeToLane
+        return rawLanes to edges
     }
 
     private fun determinePath(graph: Graph, startAt: Int) {
@@ -94,8 +119,7 @@ object GraphManager {
         } else {
             // CASE 2: Normal branch continuation
             val branch = GraphBranch(graph.getAvailableColour(startAt))
-            vertex.onBranch = branch
-            vertex.x = lastPoint.x
+            vertex.addToBranch(branch, lastPoint.x)
             vertex.registerUnavailablePoint(lastPoint.x, vertex, branch)
 
             while (i < graph.vertices.size) {
@@ -113,8 +137,7 @@ object GraphManager {
                 if (parentVertex === curVertex) {
                     vertex.registerParentProcessed()
                     val parentVertexOnBranch = curVertex.onBranch != null
-                    curVertex.onBranch = branch
-                    curVertex.x = curPoint.x
+                    curVertex.addToBranch(branch, curPoint.x)
 
                     vertex = parentVertex
                     parentVertex = vertex.getNextParent()

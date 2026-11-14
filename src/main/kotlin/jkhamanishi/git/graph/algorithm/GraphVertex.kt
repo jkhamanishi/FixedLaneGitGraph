@@ -21,6 +21,14 @@ internal data class GraphVertex(
 
     fun isMerge(): Boolean = parents.size > 1
 
+    /** Mirrors upstream addToBranch: only assigns branch and lane if the vertex is not already on a branch. */
+    fun addToBranch(branch: GraphBranch, x: Int) {
+        if (onBranch == null) {
+            onBranch = branch
+            this.x = x
+        }
+    }
+
     fun registerUnavailablePoint(x: Int, connectsToVertex: GraphVertex?, onBranch: GraphBranch) {
         if (x == nextX) {
             nextX = x + 1
